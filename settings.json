@@ -1,19 +1,21 @@
 {
     "WindowSize": {
-        "Width": 0,
-        "Hight": 0
+        "Width": 0,  // Ширина окна приложения. 0 полноэкранный режим.
+        "Hight": 0   // Высота окна приложения. 0 полноэкранный режим.
     },
     "Bot": {
+        // Управление фигурами. true - бот управляет, false - игрок.
         "IsWhiteBot": false,
         "IsBlackBot": true,
+        // Уровень сложности бота.
         "WhiteBotLevel": 0,
         "BlackBotLevel": 5,
         "BotScoringType": "NumberAndPotential",
-        "BotDelayMS": 0,
-        "NoRandom": false,
-        "Optimization": "O1"
+        "BotDelayMS": 0,      // Задержка перед выполнением хода бота.
+        "NoRandom": false,    // Вкл/выкл случайности в выборе ходов ботом.
+        "Optimization": "O1"  // Влияет на производительность бота.
     },
     "Game": {
-        "MaxNumTurns": 120
+        "MaxNumTurns": 120  // Максимальное количество ходов.
     }
 }
