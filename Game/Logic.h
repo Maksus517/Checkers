@@ -19,22 +19,6 @@ public:
         optimization = (*config)("Bot", "Optimization");
     }
 
-    vector<move_pos> find_best_turns(const bool color)
-    {
-
-        next_move.clear();
-        next_best_state.clear();
-        find_first_best_turn(board->get_board(), color, -1, -1, 0);
-        int state = 0;
-        vector<move_pos> res;
-        do {
-            res.push_back(next_move[state]);
-            state = next_best_state[state];
-        } while (state != -1 && next_move[state].x != -1);
-
-        return res;
-    }
-
 private:
     //выполняет ход на копии доски и возвращает доску после хода
     vector<vector<POS_T>> make_turn(vector<vector<POS_T>> mtx, move_pos turn) const
