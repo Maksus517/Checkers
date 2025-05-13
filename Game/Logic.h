@@ -19,7 +19,139 @@ public:
         optimization = (*config)("Bot", "Optimization");
     }
 
+    // Основная функция для поиска лучших ходов для заданного цвета
+    vector<move_pos> find_best_turns(const bool color) {
+        next_move.clear(); // очищаем вектор для хранения следующего хода
+        next_best_state.clear(); // очищаем вектор для хранения следующего состояния
+
+        // Ищем лучший первый ход, передавая текущую доску, цвет
+        find_first_best_turn(board->get_board(), color, -1, -1, 0);
+
+        vector<move_pos> res; // итоговый вектор ходов
+        int state = 0; // начинаем с начального состояния (0)
+
+        // Проходим по цепочке выбранных ходов до тех пор, пока не достигнем конца
+        do {
+            res.push_back(next_move[state]); // добавляем текущий ход в результат
+            state = next_best_state[state]; // переходим к следующему состоянию
+        } while (state != -1 && next_move[state].x != -1); // условие завершения (нет следующего хода или нет ударов)
+
+        return res; // возвращаем последовательность ходов
+    }
+
+
+
 private:
+
+    double find_first_best_turn(vector<vector<POS_T>> mtx, const bool color, const POS_T x, const POS_T y, size_t state,
+                                double alpha = -1) {
+        next_move.emplace_back(-1, -1, -1, -1); // добавляем новый элемент в вектор возможных ходов, инициализированный значениями по умолчанию
+        next_best_state.emplace_back(-1); // добавляем новое состояние, пока что -1 (конец цепочки)
+
+        // Если состояние не равно 0, значит нужно искать доступные ходы для фигуры
+        if (state != 0) {
+            find_turns(x, y, mtx); // ищем допустимые ходы для текущей фигуры
+        }
+
+        auto now_turns = turns; // копируем текущие возможные ходы
+        auto now_have_beats = beats; // копируем информацию о наличии ударов (битвах)
+
+        // Если бить нельзя и мы не в начале цепочки
+        if (!now_have_beats && state != 0) {
+            // вызываем рекурсию для другого цвета, без продолжения серии
+            return find_best_turns_rec(mtx, 1 - color, 0, alpha);
+        }
+
+        double best_score = -1; // инициализация лучшего результата (максимума)
+
+        // Перебираем все возможные ходы
+        for (auto turn : now_turns) {
+            size_t new_state = next_move.size(); // индекс нового состояния
+            double score;
+            if (now_have_beats) { // если есть возможность бить
+                // рекурсивно ищем лучший результат, продолжая серию ударов
+                score = find_first_best_turn(make_turn(mtx, turn), color, turn.x2, turn.y2, new_state, best_score);
+            } else {
+                // если бить нельзя, переходим к следующему ходу другого цвета
+                score = find_first_best_turn(make_turn(mtx, turn), 1 - color, 0, best_score);
+            }
+
+            // если найден лучший результат
+            if (score > best_score) {
+                best_score = score; // обновляем лучший результат
+                next_move[state] = turn; // запоминаем ход
+                // если был удар, обновляем состояние; иначе - конец цепочки
+                next_best_state[state] = (now_have_beats ? new_state : -1);
+            }
+        }
+        return best_score; // возвращаем лучший найденный результат
+    }
+
+    double find_best_turns_rec(vector<vector<POS_T>> mtx, const bool color, const size_t depth, double alpha = -1,
+                               double beta = INF + 1, const POS_T x = -1, const POS_T y = -1) {
+        // Если достигнута максимальная глубина поиска
+        if (depth == Max_depth) {
+            return calc_score(mtx, (depth % 2 == color)); // оцениваем текущую доску
+        }
+
+        // Если есть серия ударов (x,y заданы)
+        if (x != -1) {
+            find_turns(x, y, mtx); // ищем ходы для фигуры в позиции (x,y)
+        } else {
+            find_turns(color, mtx); // ищем ходы для текущего цвета
+        }
+
+        auto now_turns = turns; // копируем возможные ходы
+        auto now_have_beats = heve_beats; // копируем информацию о наличии ударов
+
+        // Если ударов сделать нельзя и есть серия ударов
+        if (!now_have_beats && x != -1) {
+            // рекурсия для другого цвета и увеличенной глубины
+            return find_best_turns_rec(mtx, 1 - color, depth + 1, alpha, beta);
+        }
+
+        // Если ходов нет, то текущий игрок проиграл или ничья
+        if (turns.empty()) {
+            return (depth % 2 ? 0 : INF); // 0 если ходит противник, INF если свой ход
+        }
+
+        double min_score = INF + 1; // минимальный возможный результат
+        double max_score = -1; // максимальный возможный результат
+
+        // Перебираем все возможные ходы
+        for (auto turn : now_turns) {
+            double score;
+            if (now_have_beats) { // если есть удар
+                score = find_best_turns_rec(make_turn(mtx, turn), color, depth, alpha, beta, turn.x2, turn.y2);
+            } else {
+                // если ударов нет, переходим к следующему ходу другого игрока
+                score = find_best_turns_rec(make_turn(mtx, turn), 1 - color, depth + 1, alpha, beta);
+            }
+
+            // обновляем минимальный и максимальный результаты
+            min_score = min(min_score, score);
+            max_score = max(max_score, score);
+
+            if (depth % 2) { // если ходит текущий игрок (максимизатор)
+                alpha = max(alpha, max_score); // обновляем левую границу
+            } else { // противник (минимизатор)
+                beta = min(beta, min_score); // обновляем правую границу
+            }
+
+            // если отсечение по альфа-бета
+            if (optimization != 'O0' && alpha > beta) {
+                break; // выходим из цикла
+            }
+            // при равенстве границ, можем вернуть приближённое значение
+            if (optimization == 'O2' && alpha == beta) {
+                return (depth % 2 ? max_score + 1 : min_score - 1);
+            }
+        }
+
+        // возвращаем результат в зависимости от текущей глубины
+        return (depth % 2 ? max_score : min_score);
+    }
+
     //выполняет ход на копии доски и возвращает доску после хода
     vector<vector<POS_T>> make_turn(vector<vector<POS_T>> mtx, move_pos turn) const
     {
